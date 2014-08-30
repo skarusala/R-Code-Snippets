@@ -1,0 +1,47 @@
+It's 1 p.m and your boss comes to you with some data and asks you to create some Tableau dashboards by day's end. You open the data in Tableau and find that the data is in 'wide' format, preventing you from making some important visualizations. For instance, you wanted a line chart with different line plots for variables and wanted time for the x-axis (a.k.a. time series). What can you do besides manually cut/pasting values?
+
+If you don't know what I'm talking about, look at this wikipedia entry on Wide and narrow data. For instance, if you were handed data that was in the form of an excel pivot table, it's likely that the data is in wide format. 
+
+### GOING FROM WIDE TO LONG DATA FORMAT
+
+Let's look at a sample dataset that is in wide format. The dataset called *airquality* comes preloaded with R. 
+```{r}
+data(airquality)
+head(airquality)
+```
+The long format for this dataframe will combine the Ozone, Solar.R, Wind and Temp columns into one column and the 'primary key' for the dataset will be the combination of month and day. To do this, we will need the *reshape2* package. If you don't already have this package install it:
+
+```{r, eval=FALSE}
+install.packages('reshape2')
+```
+
+The conversion from long to wide gets done with the melt function. In the code below, I specify the dataset, the variables that remain the same and also specify the creation of a new variable called *Values*. 
+```{r}
+library(reshape2)
+aql.long <- melt(airquality,                   # specify dataset
+                 id.vars = c("Month", "Day"),  # ID variables are the variables that remain the same
+                 variable.name = "Factors",    # this names the new created variable
+                 value.name = "Values")        # and fills it with the values
+```
+
+Now we're in long format:
+```{r}
+subset(aql.long, !duplicated(aql.long$Factors))
+```
+
+### GOING FROM LONG TO WIDE DATA FORMAT
+
+What if you wanted to go the other way around? You do so by using the *dcast* function. Here, you need to specify the following:
+
+```{r}
+# Converting dataframe to wide format
+airquality2 <- dcast(aql.long, Month+Day ~ Factors,     # left of "~" : variables that stay the same, right of "~" : variables to convert to rows
+               value.var="Values")                      # data that goes into new columns
+```
+
+and:
+```{r}
+head(airquality2)
+```
+
+

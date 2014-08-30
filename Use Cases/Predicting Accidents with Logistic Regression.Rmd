@@ -1,0 +1,100 @@
+---
+title: "#Article: Predicting Accidents with Logistic Regression"
+author: "Jason"
+date: "Saturday, July 26, 2014"
+output: html_document
+---
+Logistic regression as a tool belongs to the family of generalized linear models (along with its sibling, linear regression). Essentially, logistic regression is used when your dependent/predicted variable is a categorical or binary variable. In the case of binary variables, the logit model predicts the probability of an event occuring. Take for instance this dataset:
+```{r}
+accidents <- read.csv("D:/Google Drive/Documents/Analytics/R/Datasets/accidents.csv")
+
+```
+
+The data contains four variables: (USE TABLE)
+
+accident: whether individual has been in an accident or notin the past year (NO=0, YES=1)
+age: individual's age
+vision: whether individual needs eyglasses/lenses (NO=0, YES=1)
+driver_ed: whether individual has taken driver's ed in the past year
+```{r}
+head(accidents)
+summary(accidents)
+```
+This dataset contains information about car accidents in an unknown city dating back to one year. Given this historic information, we can express a relationship between age, vision, driver's ed and the probability of getting into a car accident. 
+
+How about some paired variable visualizations?
+```{r}
+library(GGally)
+ggpairs(accidents)
+```
+
+Before we build any models, let's get acquainted with the data:
+```{r}
+library(ggplot2)
+qplot(x = accident, data=accidents, binwidth=0.2) + 
+scale_x_continuous(breaks=seq(0,1,0.5)) +
+facet_wrap(~vision) + 
+ggtitle('accidents by vision')
+```
+It seems that in this dataset, individuals with vision aids seem to have more accidents on average than those who without. 
+
+```{r}
+qplot(x = accident, data=accidents, binwidth=0.2) + 
+scale_x_continuous(breaks=seq(0,1,0.5)) +
+facet_wrap(~driver_ed) + 
+ggtitle('accidents by driver_Ed ')
+
+```
+And, it seems that individuals who took driver's ed got into fewer accidents as well. 
+```{r}
+library(ggplot2)
+library(gridExtra) 
+qplot(x = age, data=accidents, binwidth=2) + 
+ggtitle('Accidents by age') +
+facet_wrap(~accident)
+```
+
+At the moment there are too many ages but it seems like younger and older people get into more accidents on average, so lets do a bit of data aggregation. The age variable range is 16 to 75, so lets create two bins for ages. 
+YoungandSenior: ages (16-25] and (65-75] 
+Middle: ages (25-65]
+
+
+Now let's create the bins:
+```{r}
+accidents$age.buckets <- ifelse(accidents$age < 25 | accidents$age >= 65, 1,0)
+accidents$age.buckets <- factor(accidents$age.buckets)
+```
+
+and let's look at the accident counts by the bins
+```{r}
+qplot(x = accident, data=accidents, binwidth=0.2) + 
+scale_x_continuous(breaks=seq(0,1,0.5)) +
+facet_wrap(~age.buckets) + 
+ggtitle('accidents by age buckets')
+```
+Okay, so we have good segregation between the factor levels for age. However, we need to be more critical and understand that this sort of data may be biased. First, we may not have representative samples across ages, so the higher number of accidents might be a consequence of having more datapoints in the young and senior age categories. Second, we don't even know if the proportion of age groups in this sample is reflective of the entire population to begin with. Third, we don't know if these findings are statistically significant to reflect the overall population. 
+
+```{r}
+hist(accidents$age)
+```
+It seems we have more datapoints with Young and Senior age buckets which *might* explain the high counts. However, our focus in this article is regression and not statistical tests. For this reason we won't go into this much, but I thought it would still be worthwhile to mention these issues as its always a good idea to think critically when the data speaks to you. For now, let's assume that this dataset represents the entire population of a far, distant planet :). 
+
+Now on to the regression model:
+```{r}
+logmodel <- glm(accident ~ vision + age.buckets,
+                data = accidents, family=binomial())
+summary(logmodel)
+```
+I had to ultimately remove the driver_ed variable from the model as it increased the p-value of the intercept to above the .05 threshold. 
+
+
+
+
+
+
+
+
+
+
+
+

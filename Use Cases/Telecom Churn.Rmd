@@ -1,0 +1,99 @@
+
+Today, our goal is to identify trends in customer churn at a telecom company. The data given to us contains 3,333 observations and 23 variables extracted from a CRM system. The dataset contains demographic as well as usage data of various customers. By creating a predictive model using decision trees, the company will be able to detect churn before it happens and take action to minimze it. 
+
+Our algorithm of choice is CART (Classification and Decision Trees). 
+
+
+```{r}
+telecom <- read.csv("http://www.dataminingconsultant.com/data/churn.txt", header=TRUE, sep=",")
+```
+
+```{r}
+head(telecom)
+```
+
+
+```{r}
+table(telecom$Churn)
+```
+The telecom dataset contains 3,333 records, out of which we have 483 (~14.5%) customers who churned. Given that the proportion of chance accuracy rate:
+
+Chance Accuracy Rate = (proportion of defaults)^2 + (proportion of non-defaults)^2
+
+This equals 72.21% for the telecom dataset. Now we have a benchmark for assessing overall model accuracy. 
+
+Let's go ahead and build our classification decision tree. Notice, that we specify -State and -Phone in the tree formula. This is because these categorical variables have too many levels. Running the tree with these variables included will result in an error message and so we remove them.  
+
+```{r}
+# creating decision tree model
+library(tree)
+treemodel <- tree(Churn. ~.-State-Phone, data = telecom)
+summary(treemodel)
+```
+The output tells that that R used 7 variables in the decision tree and that we have a total of 12 terminal nodes. We also see that the *residual mean deviance* (RMD) is 0.3372 an we have a ~5% misclassification rate. RMD is a metric that indicates how well the tree fits the data. In the real world however, we would be more interested in the RMD of the tree on the *test* dataset. Generally, a lower value indicates a better fitted decision tree. The *classification error rate* on the other hand, is an indicator of model accuracy. We see that out of 3,333 observation, the tree misclassified 197 (~5%) observations. 
+
+
+Plotting the decision tree is done using the *plot* function. The *text* function along with the *pretty=0* statement tells R to label the tree nodes with the actual variable names.
+```{r}
+plot(treemodel)
+text(treemodel,pretty=0)
+```
+
+Okay, so far so good. But how about a deeper look into the model? First, lets join the model's predicted values to the dataset and then create a confusion matrix.Without the *type = class* statement, R will predict probabilities, but we want TRUE/FALSE outcomes. Another way to achieve this is to use a probability cut-off point as I demonstrate in my Credit Scoring article.  
+
+```{r}
+telecom$predicted <- predict(treemodel, data = telecom, type ="class")
+```
+
+```{r}
+# creating a confusion matrix
+cm <- print(table(telecom$predicted, telecom$Churn, 
+                  dnn=c("Predicted", "Actual")))
+```
+
+Let's take a look at Accuracy, Sensitivy and Specificity
+```{r}
+Accuracy <- print((cm[2,2]+cm[1,1])/sum(cm) * 100)
+Sensitivity<-print(cm[2,2]/(cm[2,2]+cm[1,2])*100)
+Specificity<-print(cm[1,1]/(cm[1,1]+cm[2,1])*100)
+```
+
+Notice, that our accuracy rate of ~94% is in line with the error rate from the tree output. All the accuracy and error rates and we will get 1. (Makes sense, since error rate = 100 - accuracy rate). Also it looks like our model does better at predicting customers that do not churn. Not surprising, considering that approximately 86% of customers did not churn. However we would have liked to see a better sensitivity rate as we are more interested in predicting customers who churn. 
+
+With decision trees with many terminal nodes, we run the risk of overfitting the data. A tree with fewer branches will reduce model variance at the cost of some bias. Ideally, we want to build a tree where every node is determined based on the lowest error rate. One way to do this is to grow a large tree and then prune back using cross-validation on the dataset.We can do this by using the *cv.tree()* function. This function utilizes cross-validation to determine the optimal number of tree levels. This method is also known as *cost complexity pruning*. 
+
+```{r}
+set.seed(100)
+treevalidate <- cv.tree(object = treemodel,FUN = prune.misclass )# prune.misclass prunes the tree based on error rates
+```
+
+The *cv.tree* function has considered 7 trees (12, 11, 8, 5, 3, 2 and 1 terminal nodes) as shown in the *size* parameter. The *dev* parameter lists the *deviance* or *MSE* for each tree. 
+```{r}
+treevalidate
+```
+
+Looks like the deviance does not change much with tree sizes between 1-11:
+```{r}
+plot(x=treevalidate$size, y=treevalidate$dev, type="b")
+```
+
+Next, lets prune the tree using the *prune.misclass* function
+```{r}
+treemodel2 <- prune.misclass(treemodel, best = 10)
+plot(treemodel2)
+text(treemodel2, pretty=0)
+```
+
+```{r}
+telecom$predicted2 <- predict(treemodel2, data = telecom, type ="class" )
+
+cm2 <- print(table(telecom$predicted2, telecom$Churn, 
+                  dnn=c("Predicted", "Actual")))
+
+Accuracy2 <- print((cm2[2,2]+cm2[1,1])/sum(cm2) * 100)
+Sensitivity2 <- print(cm2[2,2]/(cm2[2,2]+cm2[1,2])*100)
+Specificity2 <- print(cm2[1,1]/(cm2[1,1]+cm2[2,1])*100)
+```
+
+As you can see, pruning the tree to 11 nodes resulted in an improvement to sensitivity at a slight cost to specificity and model accuracy. At this point, we could assess the model on the test dataset.  
+
